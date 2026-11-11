@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="hy">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101827">
+  <title>SEKA LIVE</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Armenian:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.min.js"></script>
+  <style>
+    :root{color-scheme:dark;--bg:#0b1220;--panel:#121d2e;--panel2:#1b2a40;--line:#2b3b52;--muted:#9aabc1;--text:#f4f7fb;--blue:#3978f6;--green:#16a36a;--red:#ef4444}
+    *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#172844 0,#0b1220 55%);color:var(--text);font-family:Inter,"Noto Sans Armenian",sans-serif;min-height:100vh}
+    .wrap{max-width:1120px;margin:auto;padding:20px}.top{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}.brand{font-weight:800;font-size:23px;letter-spacing:.4px}.brand span{color:#79a8ff}.pill{font-size:12px;padding:7px 11px;border:1px solid var(--line);border-radius:99px;color:var(--muted)}.pill.live{color:#ffb4b4;border-color:#743b47;background:#351b26}
+    .hero{display:grid;grid-template-columns:1.55fr .85fr;gap:18px}.panel{background:rgba(18,29,46,.94);border:1px solid var(--line);border-radius:20px;overflow:hidden;box-shadow:0 18px 50px #0003}.video-head{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--line)}h1{font-size:19px;margin:0}h2{font-size:16px;margin:0}.video-box{position:relative;background:#050a12;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;color:var(--muted)}video{width:100%;height:100%;object-fit:contain;background:#050a12}.placeholder{text-align:center;padding:24px}.placeholder .symbol{font-size:42px;margin-bottom:10px}.video-controls{padding:14px 16px;display:flex;gap:9px;flex-wrap:wrap}.side{display:flex;flex-direction:column;min-height:0}.chat-head{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}.chat-log{height:360px;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:10px}.msg{font-size:14px;line-height:1.45;overflow-wrap:anywhere}.msg b{color:#9fc0ff}.msg.system{color:var(--muted);font-size:12px}.time{color:#71849d;font-size:10px;margin-left:6px}.chat-form{display:flex;gap:8px;padding:12px;border-top:1px solid var(--line)}input{min-width:0;width:100%;background:#0c1727;color:var(--text);border:1px solid var(--line);border-radius:12px;padding:12px 13px;font:inherit;outline:none}input:focus{border-color:#5c8df5}button{border:0;border-radius:12px;padding:12px 16px;color:white;background:var(--blue);font:600 14px inherit;cursor:pointer}button.secondary{background:var(--panel2);border:1px solid var(--line)}button.danger{background:#a83242}button:disabled{opacity:.45;cursor:not-allowed}.section{margin-top:18px;padding:18px}.section p{color:var(--muted);font-size:13px;line-height:1.6}.modal{position:fixed;inset:0;background:#050a12d9;display:flex;align-items:center;justify-content:center;padding:18px;z-index:5}.dialog{width:min(430px,100%);padding:24px;background:#121d2e;border:1px solid var(--line);border-radius:20px}.dialog h2{font-size:21px;margin-bottom:8px}.dialog p{color:var(--muted);font-size:13px;line-height:1.5}.field{margin:14px 0}.field label{display:block;font-size:12px;color:var(--muted);margin-bottom:7px}.row{display:flex;gap:8px}.row>*{flex:1}.hidden{display:none!important}.notice{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.5}.host-tools{display:flex;gap:8px;flex-wrap:wrap;padding:0 16px 15px}.count{font-size:12px;color:var(--muted)}
+    @media(max-width:800px){.wrap{padding:13px}.hero{grid-template-columns:1fr}.chat-log{height:260px}.top{margin-bottom:14px}.brand{font-size:20px}.section{margin-top:13px}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top"><div class="brand">♠ SEKA <span>LIVE</span></div><div id="livePill" class="pill">● OFFLINE</div></header>
+  <main class="hero">
+    <section class="panel">
+      <div class="video-head"><h1>Ուղիղ հեռարձակում</h1><span id="viewerCount" class="count">Դիտում են՝ —</span></div>
+      <div class="video-box" id="videoBox">
+        <div class="placeholder" id="placeholder"><div class="symbol">📹</div><b>Հեռարձակումը դեռ չի սկսվել</b><div class="notice">Երբ ադմինը միացնի LIVE-ը, այստեղ կտեսնես հեռարձակումը։</div></div>
+        <video id="remoteVideo" autoplay playsinline class="hidden"></video>
+      </div>
+      <div class="video-controls">
+        <button id="startBtn" class="hidden">Սկսել LIVE</button>
+        <button id="stopBtn" class="danger hidden">Ավարտել LIVE-ը</button>
+        <button id="micBtn" class="secondary hidden">Անջատել ձայնը</button>
+        <button id="cameraBtn" class="secondary hidden">Անջատել տեսախցիկը</button>
+      </div>
+      <div id="hostTools" class="host-tools hidden"><span class="notice">Դու հեռարձակողն ես։ Հեռախոսում թույլ տուր տեսախցիկի և խոսափողի օգտագործումը։</span></div>
+    </section>
+    <section class="panel side">
+      <div class="chat-head"><h2>💬 Ընդհանուր չաթ</h2><span class="count">Ուղիղ</span></div>
+      <div id="chatLog" class="chat-log"><div class="msg system">Մուտք գործիր՝ չաթին միանալու համար։</div></div>
+      <form id="chatForm" class="chat-form"><input id="chatInput" maxlength="500" placeholder="Գրիր հաղորդագրություն…" autocomplete="off"><button type="submit">Ուղարկել</button></form>
+    </section>
+  </main>
+  <section class="panel section"><h2>Ինչպես է աշխատում</h2><p>Դիտողները մուտք են գործում իրենց անունով, դիտում են ադմինի ուղիղ հեռարձակումը և գրում ընդհանուր չաթում։ Քարտերը երևում են այնքանով, որքանով դրանք ցույց ես տալիս տեսախցիկին։ Սա հեռարձակման և չաթի մեկնարկային տարբերակն է, ոչ թե ավտոմատ քարտախաղի համակարգ։</p></section>
+</div>
+
+<div id="joinModal" class="modal">
+  <div class="dialog">
+    <h2>Բարի գալուստ SEKA LIVE</h2><p>Մուտքագրիր անունդ՝ ուղիղ հեռարձակումը դիտելու և չաթում գրելու համար։</p>
+    <form id="joinForm"><div class="field"><label for="nameInput">Քո անունը</label><input id="nameInput" maxlength="24" required placeholder="Օրինակ՝ Armen" autocomplete="nickname"></div><button type="submit" style="width:100%">Մուտք գործել</button></form>
+    <div class="notice">Դիտելու համար գաղտնաբառ պետք չէ։</div>
+    <div class="field" style="border-top:1px solid var(--line);padding-top:14px"><label>Ադմինի մուտք (միայն հեռարձակողի համար)</label><button id="adminOpen" class="secondary" style="width:100%">Ես եմ հեռարձակողը</button></div>
+  </div>
+</div>
+
+<div id="adminModal" class="modal hidden">
+  <div class="dialog">
+    <h2>Ադմինի մուտք</h2><p>Մուտքագրիր սերվերի կարգավորումներում սահմանված ադմինի գաղտնաբառը։</p>
+    <form id="adminForm"><div class="field"><label>Անուն</label><input id="adminName" maxlength="24" required placeholder="Քո անունը"></div><div class="field"><label>Ադմինի գաղտնաբառ</label><input id="adminPassword" type="password" required placeholder="Գաղտնաբառ"></div><button type="submit" style="width:100%">Մուտք և հեռարձակել</button></form>
+    <button id="adminCancel" class="secondary" style="width:100%;margin-top:9px">Փակել</button>
+  </div>
+</div>
+<script>
+(() => {
+  const socket = io();
+  const $ = id => document.getElementById(id);
+  let myName = "", isHost = false, room = null, localTracks = [], livekitUrl = "";
+  const chatLog = $("chatLog");
+
+  function addMessage(html, cls="msg") {
+    const el = document.createElement("div");
+    el.className = cls;
+    el.innerHTML = html;
+    chatLog.appendChild(el);
+    chatLog.scrollTop = chatLog.scrollHeight;
+  }
+  function safe(s) {
+    return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+  function joinChat(name) {
+    myName = name;
+    socket.emit("join-chat", name);
+    $("joinModal").classList.add("hidden");
+  }
+  async function getToken(name, role, password="") {
+    const response = await fetch("/api/token", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({name, role, adminPassword:password})
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Սխալ տեղի ունեցավ։");
+    return data;
+  }
+  async function joinRoom(name, role, password="") {
+    const data = await getToken(name, role, password);
+    room = new LivekitClient.Room({ adaptiveStream:true, dynacast:true });
+    await room.connect(livekitUrl, data.token);
+    if (role === "host") {
+      isHost = true;
+      socket.emit("host-authenticated");
+      const tracks = await LivekitClient.createLocalTracks({ audio:true, video:{ facingMode:"environment" } });
+      localTracks = tracks;
+      for (const track of tracks) {
+        await room.localParticipant.publishTrack(track);
+        if (track.kind === "video") track.attach($("remoteVideo"));
+      }
+      $("remoteVideo").classList.remove("hidden");
+      $("placeholder").classList.add("hidden");
+      $("startBtn").classList.add("hidden");
+      $("stopBtn").classList.remove("hidden");
+      $("micBtn").classList.remove("hidden");
+      $("cameraBtn").classList.remove("hidden");
+      $("hostTools").classList.remove("hidden");
+      socket.emit("host-live-state", {live:true});
+      addMessage("Դու սկսել ես հեռարձակումը։","msg system");
+    } else {
+      room.on(LivekitClient.RoomEvent.TrackSubscribed, (track) => {
+        if (track.kind === "video") {
+          track.attach($("remoteVideo"));
+          $("remoteVideo").classList.remove("hidden");
+          $("placeholder").classList.add("hidden");
+        }
+        if (track.kind === "audio") track.attach();
+      });
+      room.on(LivekitClient.RoomEvent.TrackUnsubscribed, (track) => track.detach());
+      $("startBtn").classList.add("hidden");
+    }
+  }
+
+  fetch("/api/config").then(r=>r.json()).then(c=>{livekitUrl=c.livekitUrl;}).catch(()=>{});
+  $("joinForm").addEventListener("submit", e => {
+    e.preventDefault();
+    const name = $("nameInput").value.trim();
+    if (name) joinChat(name);
+  });
+  $("adminOpen").addEventListener("click", () => $("adminModal").classList.remove("hidden"));
+  $("adminCancel").addEventListener("click", () => $("adminModal").classList.add("hidden"));
+  $("adminForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const name=$("adminName").value.trim(), password=$("adminPassword").value;
+    try {
+      if (!livekitUrl) throw new Error("LiveKit URL-ը դեռ կարգավորված չէ։");
+      await joinRoom(name,"host",password);
+      joinChat(name);
+      $("adminModal").classList.add("hidden");
+    } catch(err) { alert(err.message); }
+  });
+  $("chatForm").addEventListener("submit", e => {
+    e.preventDefault();
+    const input=$("chatInput"), text=input.value.trim();
+    if (!myName) { $("joinModal").classList.remove("hidden"); return; }
+    if (text) { socket.emit("chat-message",text); input.value=""; }
+  });
+  $("startBtn").addEventListener("click", () => $("adminModal").classList.remove("hidden"));
+  $("stopBtn").addEventListener("click", async () => {
+    socket.emit("host-live-state",{live:false});
+    if (room) await room.disconnect();
+    localTracks.forEach(t=>t.stop());
+    localTracks=[];
+    isHost=false;
+    $("remoteVideo").classList.add("hidden");
+    $("placeholder").classList.remove("hidden");
+    $("placeholder").querySelector("b").textContent="Հեռարձակումը ավարտվել է";
+    $("stopBtn").classList.add("hidden");
+    $("micBtn").classList.add("hidden");
+    $("cameraBtn").classList.add("hidden");
+    $("hostTools").classList.add("hidden");
+  });
+  $("micBtn").addEventListener("click", async () => {
+    const track=localTracks.find(t=>t.kind==="audio");
+    if(track){const enabled=track.isMuted; await track.mute(!enabled); $("micBtn").textContent=enabled?"Անջատել ձայնը":"Միացնել ձայնը";}
+  });
+  $("cameraBtn").addEventListener("click", async () => {
+    const track=localTracks.find(t=>t.kind==="video");
+    if(track){const enabled=track.isMuted; await track.mute(!enabled); $("cameraBtn").textContent=enabled?"Անջատել տեսախցիկը":"Միացնել տեսախցիկը";}
+  });
+  socket.on("chat-message", m => addMessage(`<b>${safe(m.name)}</b>: ${safe(m.text)} <span class="time">${safe(m.time)}</span>`));
+  socket.on("chat-system", m => addMessage(safe(m.text),"msg system"));
+  socket.on("live-state", state => {
+    $("livePill").textContent=state.live?"● LIVE":"● OFFLINE";
+    $("livePill").classList.toggle("live",!!state.live);
+    if(state.live && !isHost) $("startBtn").classList.add("hidden");
+    if(!state.live && !isHost) {
+      $("remoteVideo").classList.add("hidden");
+      $("placeholder").classList.remove("hidden");
+      $("placeholder").querySelector("b").textContent="Հեռարձակումը դեռ չի սկսվել";
+    }
+  });
+  // If the page loads after the stream has begun, the viewer joins the room after entering a name.
+  const originalJoinChat=joinChat;
+  joinChat = async function(name) {
+    originalJoinChat(name);
+    try {
+      if (livekitUrl && !room) await joinRoom(name,"viewer");
+    } catch(err) { console.warn(err); }
+  };
+})();
+</script>
+</body>
+</html>
